@@ -1,0 +1,61 @@
+{
+  "name": "space-image-of-the-day",
+  "version": "1.0.0",
+  "description": "Chrome Extension with MERN Stack featuring NASA's APOD and SIMBAD data",
+  "main": "server/server.js",
+  "type": "module",
+  "author": "tarekul42",
+  "license": "MIT",
+  "keywords": [
+    "nasa",
+    "apod",
+    "chrome-extension",
+    "mern",
+    "simbad",
+    "space",
+    "typescript"
+  ],
+  "scripts": {
+    "start": "node dist-server/server.js",
+    "server": "tsx server/server.ts",
+    "dev": "concurrently \"npm run server\" \"npm run extension:dev\"",
+    "extension:dev": "cd extension && npx vite",
+    "extension:build": "cd extension && npx vite build",
+    "build": "npm run extension:build && tsc -p tsconfig.server.json",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "mongodb-memory-server": "^10.1.4",
+    "mongoose": "^8.10.1",
+    "node-fetch": "^2.7.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.1",
+    "@types/node-fetch": "^2.6.12",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@typescript-eslint/eslint-plugin": "^8.58.0",
+    "@typescript-eslint/parser": "^8.58.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.2",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.5",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "globals": "^17.4.0",
+    "prettier": "^3.8.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.58.0",
+    "vite": "^6.0.0"
+  }
+}

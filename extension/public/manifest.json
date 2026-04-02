@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Space Image of the Day",
+  "version": "1.0.0",
+  "description": "NASA's Astronomy Picture of the Day - with enriched astronomical data from SIMBAD. A new cosmic image every time you open a tab.",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "http://localhost:5000/*"
+  ],
+  "chrome_url_overrides": {
+    "newtab": "index.html"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png"
+    },
+    "default_title": "Space Image of the Day"
+  }
+}
