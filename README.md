@@ -1,112 +1,78 @@
-# 🌌 Space Image of the Day — Chrome Extension
+# 🌌 Space Image of the Day — Premium Chrome Extension
 
-A professional, immersive browser extension that displays **NASA's Astronomy Picture of the Day (APOD)** every time you open a new tab. Enriched with astronomical metadata from **SIMBAD** and featuring a high-end glassmorphism UI.
+A professional, production-ready browser extension that transforms your new tabs into an immersive celestial discovery experience. This project bridges the gap between high-performance backends and cutting-edge frontend design.
 
-Built with the **MERN Stack** (MongoDB, Express.js, React, Node.js) and bundled with **Vite**.
-
-![Architecture](https://img.shields.io/badge/Architecture-MERN-purple)
-![Frontend](https://img.shields.io/badge/Frontend-React%20%2B%20Vite-blue)
-![Backend](https://img.shields.io/badge/Backend-Node.js%20%2B%20Express-green)
-![License](https://img.shields.io/badge/License-MIT-blue)
+![Architecture](https://img.shields.io/badge/Architecture-Modular-blue)
+![Frontend](https://img.shields.io/badge/Frontend-React%2019%20%2B%20Tailwind%20v4-blueviolet)
+![Backend](https://img.shields.io/badge/Backend-Bun%20%2B%20Redis-red)
+![License](https://img.shields.io/badge/License-MIT-green)
 
 ---
 
-## ✨ Features
+## ✨ Professional Features
 
-- **Immersive Full-Screen UI**: High-resolution cosmic backgrounds with radial overlays for maximum visual impact.
-- **Hero Discovery Title**: Prominent, attractive typography with interactive hover effects and glassmorphism.
-- **"Next Discovery"**: Explore NASA's entire historical archive with one click—fetch random cosmic wonders instantly.
-- **Astronomical Enrichment**: Automatically identifies object types (Galaxy, Nebula, etc.) and constellations via SIMBAD and smart text inference.
-- **Slide-out Info Panel**: A sophisticated glassmorphism panel providing deep cosmic context without cluttering the view.
-- **Zero-Config Database**: Uses an in-memory MongoDB server by default for instant setup.
-- **Responsive Design**: Adapts beautifully to different screen sizes.
-
----
-
-## 🏗️ Project Structure
-
-```
-space-image-of-the-day/
-├── server/                 # Modular MVC Backend
-│   ├── config/             # Global configurations (DB, etc.)
-│   ├── middleware/         # Global middleware (Error handler, Auth, etc.)
-│   ├── modules/            # Feature-based modules
-│   │   ├── apod/           # APOD Feature Module
-│   │   │   ├── apod.controller.js
-│   │   │   ├── apod.model.js
-│   │   │   ├── apod.route.js
-│   │   │   └── apod.service.js
-│   │   └── health/         # Health Check Module
-│   │       ├── health.controller.js
-│   │       └── health.route.js
-│   └── utils/              # Shared utility functions (NASA API, SIMBAD)
-├── extension/              # Chrome Extension Source
-│   ├── public/             # Static assets (manifest, icons)
-│   ├── src/                # React source code (JSX, CSS)
-│   ├── index.html          # Extension entry page
-│   └── vite.config.js      # Vite build configuration
-├── .env.example            # Environment template
-├── package.json            # Main project configuration
-└── README.md               # Documentation
-```
+- **Component-Based Architecture**: Follows industry-standard Atomic Design for the extension and a modular, domain-driven structure for the server.
+- **Premium Cosmic UI**: Optimized with **Glassmorphism**, high-resolution media handling, and the **Outfit** typeface for a modern astronomical aesthetic.
+- **Intelligent Caching**: Powered by **Redis** for sub-millisecond response times for frequently accessed NASA data.
+- **Micro-Animations**: Smooth, performant transitions using **Framer Motion** for a luxurious user experience.
+- **Zero-Config Service Worker**: Optionally connects to a local backend for enhanced features while maintaining a zero-config fallback.
+- **Robust Observability**: Integrated with structured logging (**Pino**) and health monitoring.
 
 ---
 
-## 🚀 Quick Start
+## 🏗️ Technology Stack
 
-### 1. Install Dependencies
+### 🔹 Backend (Server)
+- **Runtime**: [Bun](https://bun.sh) (High-performance JS runtime)
+- **Framework**: Express (Node.js/TypeScript)
+- **Caching**: [Redis](https://redis.io/) (Data persistence and high-speed delivery)
+- **Validation**: [Zod](https://zod.dev/) (Strict type-safety for env and API data)
+- **Security**: Helmet, Express-Rate-Limit, CORS
 
+### 🔹 Extension (Frontend)
+- **Framework**: React 19 (Latest stable)
+- **Build Tool**: [Vite 6](https://vitejs.dev/)
+- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
+- **Animations**: [Framer Motion](https://www.framer.com/motion/)
+- **State Management**: Context API (Domain-divided)
+
+---
+
+## 🚀 Installation & Build
+
+### 1. Backend Setup
 ```bash
-npm install
+# Navigate to server
+cd server
+
+# Install dependencies using Bun
+bun install
+
+# Start development server
+bun run dev
 ```
 
-### 2. Configure Environment
-
-Copy `.env.example` to `.env`:
+### 2. Extension Setup
 ```bash
-cp .env.example .env
-```
-*(Optional: Add your `NASA_API_KEY` for higher rate limits)*
+# From the root directory
+bun install
 
-### 3. Run in Development
-
-This starts both the backend server and the Vite development server for the extension:
-```bash
-npm run dev
+# Build the extension for Chrome/Edge
+bun run extension:build
 ```
 
-### 4. Build and Load Extension
+---
 
-To use it in your browser:
-1. Build the extension:
-   ```bash
-   npm run build
-   ```
-2. Open Chrome/Brave and go to `chrome://extensions/`
-3. Enable **Developer mode**
-4. Click **Load unpacked** and select the `extension/dist` folder.
+## 📝 Roadmap
+- [x] Refactor to Modular Architecture (Backend)
+- [x] Implement Atomic Design System (Extension)
+- [x] Integrate Redis Caching for NASA API
+- [x] Premium Glassmorphism UI Implementation
+- [ ] Multi-lingual Cosmic Explanations
+- [ ] Interactive Astronomer's Star Map
 
 ---
 
-## 📡 API Endpoints
+## 📄 License
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/apod` | GET | Get today's featured image |
-| `/api/apod/random` | GET | Fetch a random cosmic discovery from NASA |
-| `/api/apod/history` | GET | View previously discovered images |
-
----
-
-## 🛠️ Technologies
-
-- **Backend**: Node.js, Express, Mongoose, node-fetch
-- **Frontend**: React 18, Vite, Vanilla CSS (Glassmorphism)
-- **Database**: MongoDB (In-memory or Local)
-- **Data Sources**: NASA APOD API, SIMBAD Astronomical Database
-
----
-
-## 📝 License
-
-MIT — Created by [tarekul42](https://github.com/tarekul42)
+MIT — Architected & Designed by [tarekul42](https://github.com/tarekul42)

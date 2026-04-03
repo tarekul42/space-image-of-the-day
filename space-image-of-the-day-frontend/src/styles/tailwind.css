@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+
+  --color-cosmic-bg: #0a0a0c;
+  --color-nebula-blue: #3b82f6;
+  --color-star-white: #ffffff;
+
+  --radius-cosmic: 2rem;
+}
+
+@layer base {
+  body {
+    @apply bg-cosmic-bg text-white font-sans antialiased overflow-hidden selection:bg-blue-500/30;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-black/40 backdrop-blur-3xl border border-white/10 shadow-2xl;
+  }
+
+  .text-glow {
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+  }
+}
