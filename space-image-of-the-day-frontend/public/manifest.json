@@ -7,6 +7,7 @@
     "storage"
   ],
   "host_permissions": [
+    "http://localhost:5000/*",
     "https://api.nasa.gov/*",
     "https://simbad.cds.unistra.fr/*"
   ],

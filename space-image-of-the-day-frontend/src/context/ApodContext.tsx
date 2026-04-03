@@ -1,17 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-
-interface ApodData {
-  date: string;
-  title: string;
-  explanation: string;
-  url: string;
-  hdurl?: string;
-  media_type: string;
-  copyright?: string;
-  object_type?: string;
-  constellation?: string;
-  more_info_url?: string;
-}
+import { ApodData } from '../types/apod';
 
 interface ApodContextType {
   apod: ApodData | null;

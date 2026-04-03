@@ -11,9 +11,19 @@ const app: Application = express();
  * Standard Security & Performance Middlewares
  */
 app.use(helmet());
-app.use(cors());
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }),
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use((req: Request, _res: Response, next: NextFunction) => {
+  logger.info(`✨ Incoming signal on [${req.method}] ${req.path}`);
+  next();
+});
 
 /**
  * Rate Limiting
@@ -31,6 +41,21 @@ app.use("/api", limiter);
  * API Routes
  */
 app.use("/api/v1", router);
+
+/**
+ * Root Route
+ */
+app.get("/", (req: Request, res: Response) => {
+  res.status(200).json({
+    success: true,
+    message: "🌌 Welcome to the Space Image of the Day API!",
+    version: "1.0.0",
+    endpoints: {
+      apod: "/api/v1/apod",
+      health: "/health",
+    },
+  });
+});
 
 /**
  * Health Check
