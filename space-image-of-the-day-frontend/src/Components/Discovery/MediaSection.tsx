@@ -7,12 +7,12 @@ interface MediaSectionProps {
 
 export const MediaSection: React.FC<MediaSectionProps> = ({ apod }) => {
   return (
-    <div className="lg:col-span-8 relative aspect-video rounded-[2.5rem] overflow-hidden shadow-2xl shadow-blue-500/10 group">
+    <div className="absolute inset-0 w-full h-full overflow-hidden bg-black">
       {apod.media_type === 'image' ? (
         <img
           src={apod.hdurl || apod.url}
           alt={apod.title}
-          className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
+          className="w-full h-full object-cover"
         />
       ) : (
         <iframe
@@ -21,7 +21,6 @@ export const MediaSection: React.FC<MediaSectionProps> = ({ apod }) => {
           className="w-full h-full border-none"
         />
       )}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
     </div>
   );
 };

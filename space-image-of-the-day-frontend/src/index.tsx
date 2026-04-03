@@ -9,13 +9,13 @@ const App: React.FC = () => {
   const { fetchApod } = useApod();
 
   useEffect(() => {
-    fetchApod();
+    fetchApod('FETCH_RANDOM');
   }, [fetchApod]);
 
   return (
     <div className="relative w-full h-full min-h-screen">
       <StarField />
-      <main className="relative z-10 w-full min-h-screen flex flex-col items-center justify-center">
+      <main className="relative z-10 w-full min-h-screen">
         <ApodDisplay />
       </main>
     </div>

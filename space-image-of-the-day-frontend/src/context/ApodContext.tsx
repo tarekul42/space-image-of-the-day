@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { ApodData } from '../types/apod';
+import { fetchApod as fetchDirect, fetchRandomApod as fetchRandomDirect } from '../services/apod.service';
+import { enrichData } from '../utils/enrichment';
 
 interface ApodContextType {
   apod: ApodData | null;
@@ -19,9 +21,18 @@ export const ApodProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     setError(null);
     try {
-      const response = await chrome.runtime.sendMessage({ type });
-      if (response.error) throw new Error(response.error);
-      setApod(response.data);
+      // Check if we are running in a Chrome Extension context
+      if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+        const response = await chrome.runtime.sendMessage({ type });
+        if (response.error) throw new Error(response.error);
+        setApod(response.data);
+      } else {
+        // Fallback for development (localhost:5173)
+        console.warn('Chrome runtime not found. Using development fallback.');
+        const rawData = type === 'FETCH_APOD' ? await fetchDirect() : await fetchRandomDirect();
+        const enriched = await enrichData(rawData);
+        setApod(enriched);
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Signal lost with the cosmos.');
     } finally {

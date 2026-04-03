@@ -2,6 +2,7 @@ import cors from "cors";
 import express, { Application, NextFunction, Request, Response } from "express";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
+import { z } from "zod";
 import router from "./app/route/index.js";
 import logger from "./app/utils/logger.js";
 
@@ -83,8 +84,18 @@ app.use((req: Request, res: Response) => {
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
-  const statusCode = err.status || 500;
-  const message = err.message || "Internal Starship Error";
+  let statusCode = err.status || 500;
+  let message = err.message || "Internal Starship Error";
+
+  if (err instanceof z.ZodError) {
+    statusCode = 400;
+    message = "⚠️ Galactic Navigation Error: Invalid request data.";
+    return res.status(statusCode).json({
+      success: false,
+      message,
+      issues: err.issues,
+    });
+  }
 
   logger.error(err as Error, `Error: ${message}`);
 

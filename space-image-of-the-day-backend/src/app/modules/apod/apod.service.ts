@@ -68,16 +68,28 @@ const getApodByDate = async (
 
 const getRandomApod = async (): Promise<{ data: IApodData; source: "api" }> => {
   logger.info("🎲 Fetching random APOD from NASA");
-  const response = await axios.get<IApodData>(NASA_APOD_URL, {
-    params: {
-      api_key: env.NASA_API_KEY,
-      count: 1,
-    },
-  });
+  
+  let attempts = 0;
+  while (attempts < 3) {
+    const response = await axios.get<IApodData | IApodData[]>(NASA_APOD_URL, {
+      params: {
+        api_key: env.NASA_API_KEY,
+        count: 5,
+      },
+    });
 
-  // @ts-expect-error NASA API response type mismatch
-  const data = response.data[0] || response.data;
-  return { data, source: "api" };
+    const items = Array.isArray(response.data) ? response.data : [response.data];
+    const imageItem = items.find(item => item.media_type === "image");
+
+    if (imageItem) {
+      return { data: imageItem, source: "api" };
+    }
+    
+    attempts++;
+    logger.warn("No image found in random APOD fetch, retrying...");
+  }
+  
+  throw new Error("Failed to find a random image APOD after several attempts");
 };
 
 export const ApodService = {

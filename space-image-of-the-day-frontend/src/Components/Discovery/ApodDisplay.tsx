@@ -10,12 +10,16 @@ export const ApodDisplay: React.FC = () => {
   const { apod, loading, error, fetchApod } = useApod();
 
   return (
-    <div className="relative min-h-screen w-full flex flex-col items-center justify-center p-6 md:p-12">
+    <div className="absolute inset-0 w-full h-full">
       <AnimatePresence mode="wait">
         {loading ? (
-          <LoadingView />
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50">
+            <LoadingView />
+          </div>
         ) : error ? (
-          <ErrorView error={error} onRetry={() => fetchApod()} />
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50">
+            <ErrorView error={error} onRetry={() => fetchApod()} />
+          </div>
         ) : (
           apod && (
             <motion.div
@@ -23,10 +27,12 @@ export const ApodDisplay: React.FC = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 1 }}
-              className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center"
+              className="absolute inset-0 w-full h-full"
             >
               <MediaSection apod={apod} />
-              <InfoSection apod={apod} onFetchRandom={() => fetchApod('FETCH_RANDOM')} />
+              <div className="absolute inset-0 z-10 pointer-events-none p-6 md:p-8 flex items-end justify-start">
+                <InfoSection apod={apod} onFetchRandom={() => fetchApod('FETCH_RANDOM')} />
+              </div>
             </motion.div>
           )
         )}
