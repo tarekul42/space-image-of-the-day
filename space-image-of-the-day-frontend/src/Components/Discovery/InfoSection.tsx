@@ -26,8 +26,8 @@ export const InfoSection: React.FC<InfoSectionProps> = ({ apod, onFetchRandom, o
             {apod.title}
           </h1>
         </div>
-        
-        <button 
+
+        <button
           onClick={() => setShowDetails(!showDetails)}
           className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors text-white/80"
           aria-label="Toggle Details"
@@ -49,7 +49,7 @@ export const InfoSection: React.FC<InfoSectionProps> = ({ apod, onFetchRandom, o
                 {apod.explanation}
               </p>
             </div>
-            
+
             <div className="flex flex-wrap gap-2 mt-4">
               {apod.object_type && (
                 <span className="px-2.5 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full text-[9px] font-bold uppercase tracking-wider text-blue-300">
@@ -70,7 +70,11 @@ export const InfoSection: React.FC<InfoSectionProps> = ({ apod, onFetchRandom, o
           <Telescope size={14} className="mr-1.5" />
           Map Mode
         </CosmicButton>
-        <CosmicButton variant="secondary" onClick={() => window.open(apod.hdurl || apod.url)} className="flex-none py-2 px-3">
+        <CosmicButton
+          variant="secondary"
+          onClick={() => window.open(apod.hdurl || apod.url)}
+          className="flex-none py-2 px-3"
+        >
           <Download size={14} />
         </CosmicButton>
       </div>

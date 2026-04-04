@@ -1,7 +1,10 @@
 import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export const StarMapOverlay: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
+export const StarMapOverlay: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
+  isOpen,
+  onClose,
+}) => {
   const constellations = useMemo(() => {
     // Generate some random abstract constellations for the astronomer vibe
     return Array.from({ length: 15 }).map((_, i) => ({
@@ -10,7 +13,16 @@ export const StarMapOverlay: React.FC<{ isOpen: boolean; onClose: () => void }> 
       y1: Math.random() * 100,
       x2: Math.random() * 100,
       y2: Math.random() * 100,
-      label: ['Orion', 'Cygnus', 'Lyra', 'Ursa Major', 'Cassiopeia', 'Andromeda', 'Pegasus', 'Draco'][Math.floor(Math.random() * 8)]
+      label: [
+        'Orion',
+        'Cygnus',
+        'Lyra',
+        'Ursa Major',
+        'Cassiopeia',
+        'Andromeda',
+        'Pegasus',
+        'Draco',
+      ][Math.floor(Math.random() * 8)],
     }));
   }, []);
 
@@ -27,7 +39,7 @@ export const StarMapOverlay: React.FC<{ isOpen: boolean; onClose: () => void }> 
         >
           {/* Blueprint / Reticle Grid */}
           <div className="absolute inset-0 opacity-20 bg-[linear-gradient(rgba(100,200,255,0.3)_1px,transparent_1px),linear-gradient(90deg,rgba(100,200,255,0.3)_1px,transparent_1px)] bg-[size:100px_100px]" />
-          
+
           <svg className="absolute inset-0 w-full h-full pointer-events-none">
             {constellations.map((line) => (
               <g key={line.id}>
@@ -41,10 +53,22 @@ export const StarMapOverlay: React.FC<{ isOpen: boolean; onClose: () => void }> 
                   strokeDasharray="4 6"
                   initial={{ pathLength: 0 }}
                   animate={{ pathLength: 1 }}
-                  transition={{ duration: 1.5 + Math.random() * 2, ease: "easeOut" }}
+                  transition={{ duration: 1.5 + Math.random() * 2, ease: 'easeOut' }}
                 />
-                <circle cx={`${line.x1}%`} cy={`${line.y1}%`} r="2" fill="white" className="drop-shadow-[0_0_8px_white]" />
-                <circle cx={`${line.x2}%`} cy={`${line.y2}%`} r="2" fill="white" className="drop-shadow-[0_0_8px_white]" />
+                <circle
+                  cx={`${line.x1}%`}
+                  cy={`${line.y1}%`}
+                  r="2"
+                  fill="white"
+                  className="drop-shadow-[0_0_8px_white]"
+                />
+                <circle
+                  cx={`${line.x2}%`}
+                  cy={`${line.y2}%`}
+                  r="2"
+                  fill="white"
+                  className="drop-shadow-[0_0_8px_white]"
+                />
                 {line.id % 2 === 0 && (
                   <motion.text
                     x={`${(line.x1 + line.x2) / 2}%`}
@@ -62,9 +86,11 @@ export const StarMapOverlay: React.FC<{ isOpen: boolean; onClose: () => void }> 
               </g>
             ))}
           </svg>
-          
+
           <div className="absolute top-8 left-8 border-l-2 border-blue-400 pl-3">
-            <h3 className="text-blue-400 font-mono tracking-[0.3em] text-xs uppercase opacity-80">Telemetry</h3>
+            <h3 className="text-blue-400 font-mono tracking-[0.3em] text-xs uppercase opacity-80">
+              Telemetry
+            </h3>
             <p className="text-white/60 font-mono text-[10px] mt-1">SIMULATION MODE: ACTIVE</p>
           </div>
         </motion.div>
