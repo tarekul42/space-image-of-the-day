@@ -42,7 +42,7 @@ browser.runtime.onMessage.addListener(
   ) => {
     const req = request as { type: string; date?: string; lang?: string; allowLowRes?: boolean };
 
-    if (req.type === 'FETCH_APOD') {
+    if (req.type === 'FETCH_APOD' || req.type === 'UPDATE_TRANSLATION') {
       return handleFetchApod(req.date, req.lang);
     }
     if (req.type === 'FETCH_RANDOM') {

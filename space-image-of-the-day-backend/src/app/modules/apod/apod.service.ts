@@ -82,10 +82,10 @@ const getApodByDate = async (
   return { data: enrichedData, source: "api" };
 };
 
-const getRandomApod = async (lang?: string): Promise<{ data: IApodData; source: "api" }> => {
-  const targetLang = lang || "en";
+const getRandomApod = async (lang: string = "en"): Promise<{ data: IApodData; source: "api" | "cache" }> => {
+  const targetLang = lang;
   logger.info("🎲 Fetching random APOD from NASA");
-  
+
   let attempts = 0;
   while (attempts < 3) {
     const response = await axios.get<IApodData | IApodData[]>(NASA_APOD_URL, {
@@ -96,28 +96,29 @@ const getRandomApod = async (lang?: string): Promise<{ data: IApodData; source: 
     });
 
     const items = Array.isArray(response.data) ? response.data : [response.data];
-    let imageItem = items.find(item => item.media_type === "image");
+    const imageItems = items.filter(item => item.media_type === "image");
 
-    if (imageItem) {
-      if (targetLang !== "en") {
-        try {
-          logger.info(`🌎 Translating Random APOD to ${targetLang}`);
-          const [titleRes, expRes] = await Promise.all([
-            translate(imageItem.title, { to: targetLang }),
-            translate(imageItem.explanation, { to: targetLang })
-          ]);
-          imageItem = { ...imageItem, title: titleRes.text, explanation: expRes.text };
-        } catch (err) {
-          logger.error(err instanceof Error ? err : { err }, "Translation failed, falling back to English");
-        }
+    if (imageItems.length > 0) {
+      // Logic: Cache all retrieved images to Redis to reduce future latency, 
+      // but return the first one immediately.
+      const firstItem = imageItems[0];
+      
+      // We essentially "prime" the cache for these dates/langs
+      for (const item of imageItems) {
+        // We use the same getApodByDate logic to enrich and cache
+        // but we don't await the others to avoid delaying the response.
+        getApodByDate(item.date, targetLang).catch(() => {}); 
       }
-      return { data: imageItem, source: "api" };
+
+      // Re-fetch the first one through the standard cached method 
+      // to ensure consistency and enrichment.
+      return await getApodByDate(firstItem.date, targetLang);
     }
-    
+
     attempts++;
     logger.warn("No image found in random APOD fetch, retrying...");
   }
-  
+
   throw new Error("Failed to find a random image APOD after several attempts");
 };
 

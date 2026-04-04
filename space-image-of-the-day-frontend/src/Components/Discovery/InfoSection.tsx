@@ -22,9 +22,17 @@ export const InfoSection: React.FC<InfoSectionProps> = ({ apod, onFetchRandom, o
             <Telescope size={12} />
             Cosmic Discovery
           </div>
-          <h1 className="text-xl font-bold tracking-tight leading-tight line-clamp-2">
-            {apod.title}
-          </h1>
+          <AnimatePresence mode="wait">
+            <motion.h1
+              key={apod.title}
+              initial={{ opacity: 0, x: -5 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 5 }}
+              className="text-xl font-bold tracking-tight leading-tight line-clamp-2"
+            >
+              {apod.title}
+            </motion.h1>
+          </AnimatePresence>
         </div>
 
         <button
@@ -45,9 +53,17 @@ export const InfoSection: React.FC<InfoSectionProps> = ({ apod, onFetchRandom, o
             className="overflow-hidden"
           >
             <div className="pt-2 border-t border-white/5">
-              <p className="text-white/70 text-xs leading-relaxed max-h-48 overflow-y-auto pr-2 custom-scrollbar">
-                {apod.explanation}
-              </p>
+              <AnimatePresence mode="wait">
+                <motion.p
+                  key={apod.explanation}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="text-white/70 text-xs leading-relaxed max-h-48 overflow-y-auto pr-2 custom-scrollbar"
+                >
+                  {apod.explanation}
+                </motion.p>
+              </AnimatePresence>
             </div>
 
             <div className="flex flex-wrap gap-2 mt-4">

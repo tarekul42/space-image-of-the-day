@@ -13,15 +13,15 @@ export const ApodDisplay: React.FC = () => {
   const [isMapOpen, setIsMapOpen] = React.useState(false);
 
   return (
-    <div className="absolute inset-0 w-full h-full">
-      <AnimatePresence mode="wait">
-        {loading ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50">
-            <LoadingView />
-          </div>
-        ) : error ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50">
+    <div className="absolute inset-0 w-full h-full overflow-hidden">
+      <AnimatePresence mode="popLayout">
+        {error ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-md z-50">
             <ErrorView error={error} onRetry={() => fetchApod()} />
+          </div>
+        ) : !apod && loading ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-black z-50">
+            <LoadingView />
           </div>
         ) : (
           apod && (
@@ -35,6 +35,18 @@ export const ApodDisplay: React.FC = () => {
               <SettingsMenu />
               <StarMapOverlay isOpen={isMapOpen} onClose={() => setIsMapOpen(false)} />
               <MediaSection apod={apod} />
+              
+              {/* Subtle loading indicator for background updates (like translations) */}
+              {loading && (
+                <div className="absolute top-6 right-20 z-[60]">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="w-4 h-4 border-2 border-blue-500/50 border-t-blue-500 rounded-full animate-spin"
+                  />
+                </div>
+              )}
+
               <div className="absolute inset-0 z-50 pointer-events-none p-6 md:p-8 flex items-end justify-start">
                 <InfoSection
                   apod={apod}

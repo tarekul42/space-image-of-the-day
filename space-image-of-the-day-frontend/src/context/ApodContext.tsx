@@ -31,67 +31,73 @@ export const ApodProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return localStorage.getItem('allowLowRes') === 'true';
   });
 
+  const isInitialMount = React.useRef(true);
+  const prevLanguage = React.useRef(language);
+
   // ─── Initial Hydration from Storage ────────────────────────
   useEffect(() => {
     const hydrate = async () => {
       if (!browser.runtime?.id) {
         setLoading(false);
+        isInitialMount.current = false;
         return;
       }
       try {
         const BUFFER_KEY = 'random_buffer';
         const result = await browser.storage.local.get(null);
         
-        // Priority 1: Buffer (Random Discovery mode)
         const buffer = (result[BUFFER_KEY] as any[]) || [];
         if (buffer.length > 0) {
-          const item = buffer[0];
-          setApod(item);
-          setLoading(false);
+          setApod(buffer[0]);
           return;
         }
 
-        // Priority 2: Last cached today's image
         const today = new Date().toISOString().split('T')[0];
         if (result[today]) {
           setApod(result[today] as ApodData);
-          setLoading(false);
         }
       } catch (err) {
         console.error('Failed to hydrate from cache', err);
       } finally {
         setLoading(false);
+        setTimeout(() => {
+          isInitialMount.current = false;
+        }, 100);
       }
     };
     hydrate();
   }, []);
 
-  const isInitialMount = React.useRef(true);
-
   useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
+    if (isInitialMount.current) return;
+
+    // Handle Language Change
+    if (language !== prevLanguage.current) {
+      prevLanguage.current = language;
+      localStorage.setItem('userLang', language);
+      
+      if (browser.runtime?.id && apod) {
+        setLoading(true);
+        browser.runtime
+          .sendMessage({ 
+            type: 'UPDATE_TRANSLATION', 
+            date: apod.date, 
+            lang: language 
+          })
+          .then((res: any) => {
+            if (res?.data) setApod(res.data);
+          })
+          .catch(console.error)
+          .finally(() => setLoading(false));
+      }
     }
 
-    localStorage.setItem('userLang', language);
+    // Handle Resolution Preference Change
     localStorage.setItem('allowLowRes', allowLowRes.toString());
-    if (browser.runtime?.id) {
-      browser.runtime
-        .sendMessage({ type: 'CLEAR_BUFFER', lang: language, allowLowRes })
-        .catch(() => {});
-    }
-  }, [language, allowLowRes]);
+  }, [language, allowLowRes, apod]);
 
   const fetchApod = useCallback(
     async (type: 'FETCH_APOD' | 'FETCH_RANDOM' = 'FETCH_APOD') => {
-      // If we already have something from cache, don't show loading spinner for random fetch
-      // unless we specifically need to wait.
-      if (type === 'FETCH_RANDOM' && apod) {
-        // Just send the consume message if we hydrated from buffer
-        // Or if we actually want a *new* random image now (e.g. from refresh button)
-      }
-
       setLoading(true);
       setError(null);
       try {
@@ -115,7 +121,7 @@ export const ApodProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLoading(false);
       }
     },
-    [language, allowLowRes, apod],
+    [language, allowLowRes],
   );
 
   return (
