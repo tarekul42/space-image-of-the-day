@@ -3,6 +3,7 @@ import { env } from "../../config/env.js";
 import redisClient from "../../config/redis.config.js";
 import logger from "../../utils/logger.js";
 import { IApodData } from "./apod.interface.js";
+import translate from "google-translate-api-x";
 
 const NASA_APOD_URL = "https://api.nasa.gov/planetary/apod";
 const CACHE_KEY_PREFIX = "apod:";
@@ -13,14 +14,16 @@ const CACHE_KEY_PREFIX = "apod:";
  */
 const getApodByDate = async (
   date?: string,
+  lang?: string,
 ): Promise<{ data: IApodData; source: "cache" | "api" }> => {
   const targetDate = date || new Date().toISOString().split("T")[0];
-  const cacheKey = `${CACHE_KEY_PREFIX}${targetDate}`;
+  const targetLang = lang || "en";
+  const cacheKey = `${CACHE_KEY_PREFIX}${targetLang}:${targetDate}`;
 
   try {
     const cachedData = await redisClient.get(cacheKey);
     if (cachedData) {
-      logger.info(`🎯 Cache Hit for APOD: ${targetDate}`);
+      logger.info(`🎯 Cache Hit for APOD: ${targetDate} (${targetLang})`);
       return { data: JSON.parse(cachedData), source: "cache" };
     }
   } catch (err) {
@@ -35,7 +38,20 @@ const getApodByDate = async (
     },
   });
 
-  const data = response.data;
+  let data = response.data;
+
+  if (targetLang !== "en") {
+    try {
+      logger.info(`🌎 Translating APOD to ${targetLang}`);
+      const [titleRes, expRes] = await Promise.all([
+        translate(data.title, { to: targetLang }),
+        translate(data.explanation, { to: targetLang })
+      ]);
+      data = { ...data, title: titleRes.text, explanation: expRes.text };
+    } catch (err) {
+      logger.error(err instanceof Error ? err : { err }, "Translation failed, falling back to English");
+    }
+  }
 
   // Enriched data simulation (matching the reference logic)
   const isGalaxy = data.explanation.toLowerCase().includes("galaxy");
@@ -66,7 +82,8 @@ const getApodByDate = async (
   return { data: enrichedData, source: "api" };
 };
 
-const getRandomApod = async (): Promise<{ data: IApodData; source: "api" }> => {
+const getRandomApod = async (lang?: string): Promise<{ data: IApodData; source: "api" }> => {
+  const targetLang = lang || "en";
   logger.info("🎲 Fetching random APOD from NASA");
   
   let attempts = 0;
@@ -79,9 +96,21 @@ const getRandomApod = async (): Promise<{ data: IApodData; source: "api" }> => {
     });
 
     const items = Array.isArray(response.data) ? response.data : [response.data];
-    const imageItem = items.find(item => item.media_type === "image");
+    let imageItem = items.find(item => item.media_type === "image");
 
     if (imageItem) {
+      if (targetLang !== "en") {
+        try {
+          logger.info(`🌎 Translating Random APOD to ${targetLang}`);
+          const [titleRes, expRes] = await Promise.all([
+            translate(imageItem.title, { to: targetLang }),
+            translate(imageItem.explanation, { to: targetLang })
+          ]);
+          imageItem = { ...imageItem, title: titleRes.text, explanation: expRes.text };
+        } catch (err) {
+          logger.error(err instanceof Error ? err : { err }, "Translation failed, falling back to English");
+        }
+      }
       return { data: imageItem, source: "api" };
     }
     

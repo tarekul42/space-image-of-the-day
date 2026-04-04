@@ -4,8 +4,8 @@ import { ApodService } from "./apod.service.js";
 
 const getApod = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { date } = req.query;
-    const result = await ApodService.getApodByDate(date as string);
+    const { date, lang } = req.query;
+    const result = await ApodService.getApodByDate(date as string, lang as string);
     res.status(200).json({
       success: true,
       message: "Cosmic data retrieved successfully",
@@ -26,7 +26,8 @@ const getRandomApod = async (
   next: NextFunction,
 ) => {
   try {
-    const result = await ApodService.getRandomApod();
+    const { lang } = req.query;
+    const result = await ApodService.getRandomApod(lang as string);
     res.status(200).json({
       success: true,
       message: "Random discovery successful",

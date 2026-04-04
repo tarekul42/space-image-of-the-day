@@ -8,9 +8,10 @@ import { AnimatePresence, motion } from 'framer-motion';
 interface InfoSectionProps {
   apod: ApodData;
   onFetchRandom: () => void;
+  onToggleMap: () => void;
 }
 
-export const InfoSection: React.FC<InfoSectionProps> = ({ apod, onFetchRandom }) => {
+export const InfoSection: React.FC<InfoSectionProps> = ({ apod, onFetchRandom, onToggleMap }) => {
   const [showDetails, setShowDetails] = useState(false);
 
   return (
@@ -65,9 +66,12 @@ export const InfoSection: React.FC<InfoSectionProps> = ({ apod, onFetchRandom })
           <Map size={14} className="mr-1.5" />
           Next
         </CosmicButton>
-        <CosmicButton variant="secondary" onClick={() => window.open(apod.hdurl || apod.url)} className="flex-1 py-2 text-xs">
-          <Download size={14} className="mr-1.5" />
-          HD View
+        <CosmicButton variant="secondary" onClick={onToggleMap} className="flex-1 py-2 text-xs">
+          <Telescope size={14} className="mr-1.5" />
+          Map Mode
+        </CosmicButton>
+        <CosmicButton variant="secondary" onClick={() => window.open(apod.hdurl || apod.url)} className="flex-none py-2 px-3">
+          <Download size={14} />
         </CosmicButton>
       </div>
     </GlassCard>

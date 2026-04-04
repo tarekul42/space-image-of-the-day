@@ -227,8 +227,8 @@ Then go to `chrome://extensions`, enable **Developer Mode**, and **Load unpacked
 - [x] Video content filtering
 - [x] Zero-latency pre-fetching buffer
 - [x] Browser startup pre-loading
-- [ ] Interactive astronomer's star map overlay
-- [ ] Multi-lingual cosmic explanations
+- [x] Interactive astronomer's star map overlay
+- [x] Multi-lingual cosmic explanations
 
 ---
 

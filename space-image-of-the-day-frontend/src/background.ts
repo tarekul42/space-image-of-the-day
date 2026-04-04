@@ -10,7 +10,7 @@ import { enrichData } from './utils/enrichment';
 
 chrome.runtime.onMessage.addListener(
   (
-    request: { type: string; date?: string },
+    request: { type: string; date?: string; lang?: string },
     _sender: chrome.runtime.MessageSender,
     sendResponse: (response: {
       data?: unknown;
@@ -20,19 +20,23 @@ chrome.runtime.onMessage.addListener(
     }) => void,
   ) => {
     if (request.type === 'FETCH_APOD') {
-      handleFetchApod(request.date).then(sendResponse);
+      handleFetchApod(request.date, request.lang).then(sendResponse);
       return true; // Keep channel open for async
     }
     if (request.type === 'FETCH_RANDOM') {
-      handleFetchRandom().then(sendResponse);
+      handleFetchRandom(request.lang).then(sendResponse);
+      return true;
+    }
+    if (request.type === 'CLEAR_BUFFER') {
+      handleClearBuffer(request.lang).then(sendResponse);
       return true;
     }
   },
 );
 
-async function handleFetchApod(date?: string) {
+async function handleFetchApod(date?: string, lang?: string) {
   try {
-    const rawData = await fetchApod(date);
+    const rawData = await fetchApod(date, lang);
     const enriched = await enrichData(rawData);
 
     // Cache it
@@ -55,7 +59,13 @@ const BUFFER_LIMIT = 3;
 const BUFFER_KEY = 'random_buffer';
 let isRefilling = false;
 
-async function handleFetchRandom() {
+async function handleClearBuffer(lang?: string) {
+  await chrome.storage.local.set({ [BUFFER_KEY]: [] });
+  refillBufferIfNeeded(0, lang);
+  return { data: { success: true } };
+}
+
+async function handleFetchRandom(lang?: string) {
   try {
     const result = await chrome.storage.local.get(BUFFER_KEY);
     const buffer: any[] = Array.isArray(result[BUFFER_KEY]) ? result[BUFFER_KEY] : [];
@@ -63,12 +73,12 @@ async function handleFetchRandom() {
     if (buffer.length > 0) {
       const dataToReturn = buffer.shift();
       await chrome.storage.local.set({ [BUFFER_KEY]: buffer });
-      refillBufferIfNeeded(buffer.length);
+      refillBufferIfNeeded(buffer.length, lang);
       return { data: dataToReturn };
     } else {
-      const rawData = await fetchRandomApod();
+      const rawData = await fetchRandomApod(lang);
       const enriched = await enrichData(rawData);
-      refillBufferIfNeeded(0);
+      refillBufferIfNeeded(0, lang);
       return { data: enriched };
     }
   } catch (error: unknown) {
@@ -82,13 +92,13 @@ async function handleFetchRandom() {
   }
 }
 
-async function refillBufferIfNeeded(currentLength: number) {
+async function refillBufferIfNeeded(currentLength: number, lang?: string) {
   if (isRefilling || currentLength >= BUFFER_LIMIT) return;
   isRefilling = true;
   try {
     const needed = BUFFER_LIMIT - currentLength;
     for (let i = 0; i < needed; i++) {
-        const rawData = await fetchRandomApod();
+        const rawData = await fetchRandomApod(lang);
         const enriched = await enrichData(rawData);
         const result = await chrome.storage.local.get(BUFFER_KEY);
         const currentBuffer: any[] = Array.isArray(result[BUFFER_KEY]) ? result[BUFFER_KEY] : [];

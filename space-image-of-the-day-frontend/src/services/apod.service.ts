@@ -2,9 +2,10 @@ import { ApodData } from '../types/apod';
 
 const BACKEND_APOD_URL = 'http://localhost:5000/api/v1/apod';
 
-export async function fetchApod(date?: string): Promise<ApodData> {
+export async function fetchApod(date?: string, lang?: string): Promise<ApodData> {
   const url = new URL(BACKEND_APOD_URL);
   if (date) url.searchParams.append('date', date);
+  if (lang) url.searchParams.append('lang', lang);
 
   const response = await fetch(url.toString());
   if (!response.ok) {
@@ -15,8 +16,10 @@ export async function fetchApod(date?: string): Promise<ApodData> {
   return result.data;
 }
 
-export async function fetchRandomApod(): Promise<ApodData> {
-  const response = await fetch(`${BACKEND_APOD_URL}/random`);
+export async function fetchRandomApod(lang?: string): Promise<ApodData> {
+  const url = new URL(`${BACKEND_APOD_URL}/random`);
+  if (lang) url.searchParams.append('lang', lang);
+  const response = await fetch(url.toString());
   if (!response.ok) throw new Error('Failed to fetch random discovery');
   const result = await response.json();
   return result.data;
