@@ -5,6 +5,7 @@ import {
   fetchRandomApod as fetchRandomDirect,
 } from '../services/apod.service';
 import { enrichData } from '../utils/enrichment';
+import browser from '../browser';
 
 interface ApodContextType {
   apod: ApodData | null;
@@ -21,7 +22,7 @@ const ApodContext = createContext<ApodContextType | undefined>(undefined);
 
 export const ApodProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [apod, setApod] = useState<ApodData | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Default to true while we check cache
   const [error, setError] = useState<string | null>(null);
   const [language, setLanguage] = useState<string>(() => {
     return localStorage.getItem('userLang') || 'en';
@@ -30,11 +31,53 @@ export const ApodProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return localStorage.getItem('allowLowRes') === 'true';
   });
 
+  // ─── Initial Hydration from Storage ────────────────────────
   useEffect(() => {
+    const hydrate = async () => {
+      if (!browser.runtime?.id) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const BUFFER_KEY = 'random_buffer';
+        const result = await browser.storage.local.get(null);
+        
+        // Priority 1: Buffer (Random Discovery mode)
+        const buffer = (result[BUFFER_KEY] as any[]) || [];
+        if (buffer.length > 0) {
+          const item = buffer[0];
+          setApod(item);
+          setLoading(false);
+          return;
+        }
+
+        // Priority 2: Last cached today's image
+        const today = new Date().toISOString().split('T')[0];
+        if (result[today]) {
+          setApod(result[today] as ApodData);
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('Failed to hydrate from cache', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    hydrate();
+  }, []);
+
+  const isInitialMount = React.useRef(true);
+
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
     localStorage.setItem('userLang', language);
     localStorage.setItem('allowLowRes', allowLowRes.toString());
-    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-      chrome.runtime
+    if (browser.runtime?.id) {
+      browser.runtime
         .sendMessage({ type: 'CLEAR_BUFFER', lang: language, allowLowRes })
         .catch(() => {});
     }
@@ -42,17 +85,23 @@ export const ApodProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchApod = useCallback(
     async (type: 'FETCH_APOD' | 'FETCH_RANDOM' = 'FETCH_APOD') => {
+      // If we already have something from cache, don't show loading spinner for random fetch
+      // unless we specifically need to wait.
+      if (type === 'FETCH_RANDOM' && apod) {
+        // Just send the consume message if we hydrated from buffer
+        // Or if we actually want a *new* random image now (e.g. from refresh button)
+      }
+
       setLoading(true);
       setError(null);
       try {
-        // Check if we are running in a Chrome Extension context
-        if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-          const response = await chrome.runtime.sendMessage({ type, lang: language, allowLowRes });
-          if (response.error) throw new Error(response.error);
-          setApod(response.data);
+        if (browser.runtime?.id) {
+          const response = await browser.runtime.sendMessage({ type, lang: language, allowLowRes });
+          const res = response as { data?: ApodData; error?: string };
+          if (res.error) throw new Error(res.error);
+          setApod(res.data ?? null);
         } else {
-          // Fallback for development (localhost:5173)
-          console.warn('Chrome runtime not found. Using development fallback.');
+          console.warn('Extension runtime not found. Using development fallback.');
           const rawData =
             type === 'FETCH_APOD'
               ? await fetchDirect(undefined, language)
@@ -66,7 +115,7 @@ export const ApodProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLoading(false);
       }
     },
-    [language, allowLowRes],
+    [language, allowLowRes, apod],
   );
 
   return (

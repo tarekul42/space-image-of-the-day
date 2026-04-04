@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
+import browser from './browser';
 
 const OptionsPage: React.FC = () => {
   const [apiKey, setApiKey] = useState('');
@@ -10,47 +11,43 @@ const OptionsPage: React.FC = () => {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    chrome.storage.sync.get(
-      ['settings'],
-      (result: {
-        settings?: { nasaApiKey?: string; reducedMotion?: boolean; highContrast?: boolean };
-      }) => {
+    browser.storage.sync
+      .get(['settings'])
+      .then((result: { settings?: { nasaApiKey?: string; reducedMotion?: boolean; highContrast?: boolean } }) => {
         if (result.settings) {
           setApiKey(result.settings.nasaApiKey || '');
           setReducedMotion(result.settings.reducedMotion || false);
           setHighContrast(result.settings.highContrast || false);
         }
-      },
-    );
+      });
 
     calculateCacheSize();
   }, []);
 
   const calculateCacheSize = () => {
-    chrome.storage.local.getBytesInUse(null, (bytes: number) => {
+    browser.storage.local.getBytesInUse(null).then((bytes: number) => {
       setCacheSize(`${(bytes / 1024).toFixed(2)} KB`);
     });
   };
 
   const handleSave = () => {
-    chrome.storage.sync.set(
-      {
+    browser.storage.sync
+      .set({
         settings: {
           nasaApiKey: apiKey,
           reducedMotion,
           highContrast,
         },
-      },
-      () => {
+      })
+      .then(() => {
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
-      },
-    );
+      });
   };
 
   const clearCache = () => {
     if (confirm('Clear all locally cached astronomical images and metadata?')) {
-      chrome.storage.local.clear(() => {
+      browser.storage.local.clear().then(() => {
         calculateCacheSize();
       });
     }
