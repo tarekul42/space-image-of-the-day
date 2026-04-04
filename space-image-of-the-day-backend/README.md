@@ -229,8 +229,8 @@ bun run dev
 - [x] Security hardening (Helmet, CORS, rate limiting)
 - [x] Integration tests with Vitest + Supertest
 - [x] GitHub Actions CI pipeline
-- [ ] Response compression (gzip)
-- [ ] Prometheus metrics endpoint
+- [x] Response compression (gzip)
+- [x] Prometheus metrics endpoint
 
 ---
 

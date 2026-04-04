@@ -1,5 +1,7 @@
+import compression from "compression";
 import cors from "cors";
 import express, { Application, NextFunction, Request, Response } from "express";
+import extromBundle from "express-prom-bundle";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import { z } from "zod";
@@ -21,6 +23,20 @@ app.use(
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+/**
+ * Performance & Metrics Middlewares
+ */
+app.use(compression()); // Compress all responses
+const metricsMiddleware = extromBundle({
+  includeMethod: true,
+  includePath: true,
+  promClient: {
+    collectDefaultMetrics: {},
+  },
+});
+app.use(metricsMiddleware); // Exposes /metrics
+
 app.use((req: Request, _res: Response, next: NextFunction) => {
   logger.info(`✨ Incoming signal on [${req.method}] ${req.path}`);
   next();
