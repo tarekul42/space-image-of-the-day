@@ -60,21 +60,21 @@ Redis sits between the service and NASA. The strategy is simple but powerful:
 
 ```ts
 // apod.service.ts
-const cacheKey = `apod:${targetDate}`;
+const cacheKey = `apod:${targetLang}:${targetDate}`;
 
 // Check cache first
 const cachedData = await redisClient.get(cacheKey);
 if (cachedData) {
-  logger.info(`🎯 Cache Hit for APOD: ${targetDate}`);
+  logger.info(`🎯 Cache Hit for APOD: ${targetDate} (${targetLang})`);
   return { data: JSON.parse(cachedData), source: "cache" };
 }
 
-// Miss: call NASA, then store for 24 hours
+// Miss: call NASA, translate if needed, then store for 24 hours
 const response = await axios.get(NASA_APOD_URL, { params: { date, api_key } });
 await redisClient.set(cacheKey, JSON.stringify(enrichedData), { EX: 86400 });
 ```
 
-The cache key is scoped by date (`apod:2025-01-15`), so each day's image is stored independently. First request of the day: hits NASA. Every request after: hits Redis at sub-millisecond speeds. The response even tells the client whether data came from cache or API, useful for debugging and instrumentation.
+The cache key is scoped by **both language and date** (`apod:es:2025-01-15`), so each language variant is stored independently. The first Spanish-speaking user pays the translation cost once; every subsequent request for that date in Spanish is a Redis hit at sub-millisecond speeds.
 
 ---
 
@@ -99,6 +99,33 @@ while (attempts < 3) {
 ```
 
 Requesting 5 at a time and filtering client-side (server-side from the extension's perspective) gives overwhelmingly good odds of finding an image immediately. The retry loop with `attempts < 3` is a final safety valve. In practice, the first batch always contains at least one image.
+
+---
+
+## Chapter 4: Multi-lingual Cosmic Explanations
+
+NASA writes every APOD description in English. Making translation happen in the browser would require shipping API keys into the extension bundle — a security antipattern. Instead, it's handled here, at the backend edge:
+
+```ts
+// apod.service.ts
+if (targetLang !== 'en') {
+  const [titleRes, expRes] = await Promise.all([
+    translate(data.title, { to: targetLang }),
+    translate(data.explanation, { to: targetLang }),
+  ]);
+  data = { ...data, title: titleRes.text, explanation: expRes.text };
+}
+```
+
+The `google-translate-api-x` package acts as a proxy to Google Translate's web API — no billing account needed. The translated response is cached in Redis under the language-scoped key, so the translation API is called at most once per language per day per image. **11 languages** are supported out of the box.
+
+The `lang` query parameter flows through the entire request chain:
+```
+GET /api/v1/apod/random?lang=bn
+→ translates to Bengali
+→ cached at apod:bn:<random-date>
+→ subsequent requests: Redis hit, <1ms
+```
 
 ---
 
@@ -193,9 +220,11 @@ bun run dev
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/v1/apod` | Today's Astronomical Picture of the Day |
+| `GET` | `/api/v1/apod` | Today's APOD (English) |
 | `GET` | `/api/v1/apod?date=YYYY-MM-DD` | APOD for a specific date |
-| `GET` | `/api/v1/apod/random` | Random image APOD (videos filtered out) |
+| `GET` | `/api/v1/apod?lang=es` | Today's APOD translated to Spanish |
+| `GET` | `/api/v1/apod/random` | Random image APOD (videos filtered out, English) |
+| `GET` | `/api/v1/apod/random?lang=bn` | Random APOD translated to Bengali |
 | `GET` | `/health` | Server health check |
 
 ### Example Response
@@ -221,8 +250,9 @@ bun run dev
 
 ## Roadmap
 
+### v1 — Shipped ✅
 - [x] Modular domain-driven architecture
-- [x] Redis caching (24hr TTL per date)
+- [x] Redis caching (24hr TTL, scoped by language + date)
 - [x] Random endpoint with video filtering
 - [x] Zod environment validation
 - [x] Structured Pino logging
@@ -231,6 +261,12 @@ bun run dev
 - [x] GitHub Actions CI pipeline
 - [x] Response compression (gzip)
 - [x] Prometheus metrics endpoint
+- [x] Multi-lingual translations (11 languages, `google-translate-api-x`)
+
+### v2 — Planned 🚀
+- [ ] SIMBAD coordinate lookup endpoint (RA/Dec for star map)
+- [ ] Persistent per-user translation preferences
+- [ ] Rate-limit translation calls to avoid proxy throttling
 
 ---
 

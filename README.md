@@ -161,6 +161,68 @@ Now, the moment Chrome launches — before the user has even reached for their m
 
 ---
 
+## Chapter 6: The Resolution Problem — Blurry Images on Big Screens
+
+With the pre-fetching buffer working well, a new quality problem emerged. NASA's APOD archive spans 30+ years. Some older images are tiny — `480×320`, `640×480` — images from the 1990s and early 2000s. When displayed fullscreen on a modern 4K monitor, they stretch to oblivion.
+
+**The fix needed to be invisible.** A spinner saying "searching for HD image..." would ruin the instant-load experience we'd worked so hard to achieve.
+
+The solution was to inspect image dimensions *inside the buffer pre-fill step*, before the image ever reaches the user:
+
+```ts
+// background.ts — getImageDimensions()
+async function getImageDimensions(url: string) {
+  const blob = await fetch(url).then(r => r.blob());
+  const bitmap = await createImageBitmap(blob);
+  const dims = { width: bitmap.width, height: bitmap.height };
+  bitmap.close();
+  return dims;
+}
+
+// Inside refillBufferIfNeeded — retry loop
+const dims = await getImageDimensions(rawData.hdurl || rawData.url);
+const isHighRes = dims.width >= 1000 && dims.height >= 700;
+
+if (!allowLowRes && !isHighRes) {
+  console.log(`Skipping low-res (${dims.width}x${dims.height}): ${rawData.title}`);
+  continue; // fetch another one
+}
+```
+
+`createImageBitmap` is a native Web API available inside Service Workers. It decodes the image and exposes dimensions without ever touching the DOM — zero UI impact.
+
+By default, only images ≥ 1000×700 px enter the buffer. Users who *want* to see older, smaller archive images can toggle it on via a **Settings panel**, which renders small images naturally sized on an animated starfield background instead of stretching them fullscreen.
+
+---
+
+## Chapter 7: Speaking the Universe's Language — Multi-lingual Explanations
+
+NASA writes every APOD description in English. But space belongs to everyone.
+
+Adding browser-side translation was not an option — it would mean shipping translation API keys into the extension bundle (a security antipattern) or making unpredictable third-party network calls that would slow down the rendering path.
+
+Instead, translation happens on the **backend**, in the same place caching and filtering already live:
+
+```ts
+// apod.service.ts
+if (targetLang !== 'en') {
+  const [titleRes, expRes] = await Promise.all([
+    translate(data.title, { to: targetLang }),
+    translate(data.explanation, { to: targetLang }),
+  ]);
+  data = { ...data, title: titleRes.text, explanation: expRes.text };
+}
+
+// Cache key now includes language — Spanish gets its own slot
+const cacheKey = `apod:${targetLang}:${targetDate}`;
+```
+
+The cache key is scoped by both language and date (`apod:es:2024-04-04`). The first user to request an APOD in Spanish pays the translation cost once. Every subsequent Spanish request is a Redis cache hit — sub-millisecond, free.
+
+The language selector sits unobtrusively in the top-right corner. Changing language triggers a `CLEAR_BUFFER` message to the service worker, which immediately begins pre-filling a fresh buffer in the new language so the *next* tab is already translated before the user clicks it.
+
+---
+
 ## The Result
 
 | Scenario | Before | After |
@@ -169,6 +231,8 @@ Now, the moment Chrome launches — before the user has even reached for their m
 | Videos appearing as APOD | ✅ | ❌ Filtered at source — images only |
 | Loading spinner on tab open | ✅ | ❌ Eliminated — pre-fetched buffer |
 | Loading spinner on browser start | ✅ | ❌ Eliminated — `onStartup` hook |
+| Blurry low-res images fullscreen | ✅ | ❌ Filtered by default via bitmap probing |
+| English-only descriptions | ✅ | ❌ 11 languages, server-translated & cached |
 | API overuse / rate limits | Risk | Mitigated via Redis + proxy server |
 | NASA API change breaks all users | Risk | Mitigated — server is the single point of update |
 
@@ -194,7 +258,8 @@ Now, the moment Chrome launches — before the user has even reached for their m
 | **Tailwind CSS v4** | Utility-first styling |
 | **Framer Motion** | Smooth, performant animations |
 | **Chrome Storage API** | Pre-fetching buffer persistence |
-| **Service Worker** | Background orchestration |
+| **Service Worker** | Background orchestration, resolution probing, language routing |
+| **`createImageBitmap`** | Native dimension inspection in service worker (no DOM) |
 
 ---
 
@@ -221,14 +286,24 @@ Then go to `chrome://extensions`, enable **Developer Mode**, and **Load unpacked
 
 ## Roadmap
 
+### v1 — Shipped ✅
 - [x] Modular backend architecture (domain-driven)
 - [x] Redis API caching layer
 - [x] Random image shuffle on every new tab
 - [x] Video content filtering
 - [x] Zero-latency pre-fetching buffer
 - [x] Browser startup pre-loading
-- [x] Interactive astronomer's star map overlay
-- [x] Multi-lingual cosmic explanations
+- [x] Star map simulation overlay
+- [x] Multi-lingual cosmic explanations (11 languages, server-cached)
+- [x] HD image resolution filtering (≥1000×700) with low-res opt-in
+- [x] Consolidated settings panel (language + resolution toggle)
+
+### v2 — Planned 🚀
+- [ ] Real positional star map (RA/Dec from SIMBAD, rendered via D3)
+- [ ] Central search bar — make the extension a true productivity tool
+- [ ] "This Week in Space" mode — auto-cycle last 7 days of APOD
+- [ ] Progressive image loading — low-res preview → silent HD upgrade
+- [ ] Quick-links row for user's top sites
 
 ---
 

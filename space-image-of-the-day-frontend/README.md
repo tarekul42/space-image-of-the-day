@@ -150,7 +150,33 @@ Now `localhost:5173` works exactly like the real extension. Hot Module Reload, i
 
 ---
 
-## Chapter 5: Rethinking the UI for the Real World
+## Chapter 5: The Resolution Problem — Blurry Images on Big Screens
+
+NASA's 30-year archive includes images from the 1990s — sometimes `480×320` pixels. Stretched fullscreen on a 1440p monitor they look terrible, which breaks the premium feel of the extension.
+
+The fix happens inside the **service worker's buffer-fill loop** using `createImageBitmap`, a native Web API available in workers:
+
+```ts
+async function getImageDimensions(url: string) {
+  const blob = await fetch(url).then(r => r.blob());
+  const bitmap = await createImageBitmap(blob);
+  const dims = { width: bitmap.width, height: bitmap.height };
+  bitmap.close(); // free memory immediately
+  return dims;
+}
+
+// Skip if under threshold and user hasn't opted in
+if (!allowLowRes && dims.width < 1000) continue;
+```
+
+This runs *before* the image enters the buffer — the user never sees a bad image. The dimensions are attached to the data object and used by `MediaSection` to decide the rendering mode:
+
+- **High-res (≥ 1000×700):** fullscreen `object-cover`, same as always.
+- **Low-res (opted in):** image renders at its **natural size**, centered on an animated `StarField` background — no blur, no stretching.
+
+---
+
+## Chapter 6: Rethinking the UI for the Real World
 
 I built a beautiful initial UI: a full 12-column grid with a massive image card on the left and a detailed info panel on the right. It looked stunning in isolation.
 
@@ -185,15 +211,16 @@ The center of the screen stays clear. That's where users focus when they're abou
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| UI Framework | React 19 |
-| Build Tool | Vite + Bun |
-| Styling | Tailwind CSS v4 (beta) |
-| Animations | Framer Motion |
-| Icons | Lucide React |
-| Extension API | Chrome Manifest V3 |
-| Type Safety | TypeScript |
+| Layer | Technology | Purpose |
+|---|---|---|
+| UI Framework | React 19 | Component-driven rendering |
+| Build Tool | Vite + Bun | Fast bundling, extension-ready output |
+| Styling | Tailwind CSS v4 | Utility classes, glassmorphism layers |
+| Animations | Framer Motion | Smooth transitions, star map SVG draws |
+| Icons | Lucide React | Consistent vector icon set |
+| Extension API | Chrome Manifest V3 | Service worker bridge, storage API |
+| Type Safety | TypeScript | End-to-end typed data contracts |
+| Image Probing | `createImageBitmap` | Decode pixel dimensions in SW without DOM |
 
 ---
 
@@ -245,12 +272,28 @@ bun run build
 
 ---
 
-## What I'd Build Next
+## Roadmap
 
-- **Central search bar** in the empty middle of the screen, making the extension a true productivity tool.
-- **Quick links row** above the widget for user's top sites.
-- **A "This Week in Space" mode** that cycles through the past 7 days of APOD automatically.
-- **Progressive image loading**: show the standard-res `url` first while the HD version loads silently in the background.
+### v1 — Shipped ✅
+- [x] Service worker data-fetching bridge (no CORS issues)
+- [x] Offline fallback to most recent cached image
+- [x] SIMBAD astronomical enrichment pipeline
+- [x] Dev-mode fallback (full hot-reload at `localhost:5173`)
+- [x] Fullscreen ambient image layout (bottom-left info widget)
+- [x] Pre-fetching buffer (3-image queue, instant tab open)
+- [x] `onStartup` / `onInstalled` lifecycle pre-loading
+- [x] Star map simulation overlay (SVG constellations, framer-motion)
+- [x] Multi-lingual explanations (11 languages, server-translated)
+- [x] HD resolution filtering — `createImageBitmap` image probing in SW
+- [x] Low-res fallback rendering with StarField ambient background
+- [x] Consolidated settings panel (language selector + resolution toggle)
+
+### v2 — Planned 🚀
+- [ ] Real positional star map (RA/Dec from SIMBAD + D3 sky projection)
+- [ ] Central search bar in the screen center
+- [ ] Quick-links row for user's top sites
+- [ ] "This Week in Space" mode — auto-cycle last 7 days of APOD
+- [ ] Progressive image loading (standard-res → HD silent upgrade)
 
 ---
 
