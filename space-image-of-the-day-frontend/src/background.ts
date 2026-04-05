@@ -1,20 +1,15 @@
-/**
- * background.ts - Extension Background Script (Chrome + Firefox)
- * Coordinates fetching, enrichment, and caching.
- *
- * Uses the webextension-polyfill (via ./browser) so that browser.* APIs
- * work identically on both Chrome (MV3 service worker) and Firefox (MV3
- * background script). No chrome.* calls appear here directly.
- */
-
 import browser from './browser';
 import { fetchApod, fetchRandomApod } from './services/apod.service';
 import { enrichData } from './utils/enrichment';
 import { saveImageBlob, clearOldImages } from './utils/storage';
+import { starterApods } from './data/starterApods';
 
-// ─── Resolution Threshold ────────────────────────────────────
+// ─── Constants ───────────────────────────────────────────────
 const MIN_WIDTH = 1000;
 const MIN_HEIGHT = 700;
+const BUFFER_LIMIT = 10;
+const BUFFER_KEY = 'random_buffer';
+const PURGE_KEY = 'cache_purge_v2';
 
 /**
  * Probe the pixel dimensions of an image URL and return the Blob.
@@ -33,7 +28,7 @@ async function getImageData(url: string): Promise<{ width: number; height: numbe
   }
 }
 
-// ─── Message Handling & Caching ──────────────────────────────
+// ─── Message Handling ────────────────────────────────────────
 
 browser.runtime.onMessage.addListener(
   (
@@ -42,14 +37,18 @@ browser.runtime.onMessage.addListener(
   ) => {
     const req = request as { type: string; date?: string; lang?: string; allowLowRes?: boolean };
 
-    if (req.type === 'FETCH_APOD' || req.type === 'UPDATE_TRANSLATION') {
-      return handleFetchApod(req.date, req.lang);
-    }
-    if (req.type === 'FETCH_RANDOM') {
-      return handleFetchRandom(req.lang, req.allowLowRes);
-    }
-    if (req.type === 'CLEAR_BUFFER') {
-      return handleClearBuffer(req.lang, req.allowLowRes);
+    // Use a pattern that ensures we ALWAYS return a promise or false.
+    // This prevents "Receiving end does not exist" synchronously.
+    switch (req.type) {
+      case 'FETCH_APOD':
+      case 'UPDATE_TRANSLATION':
+        return handleFetchApod(req.date, req.lang);
+      case 'FETCH_RANDOM':
+        return handleFetchRandom(req.lang, req.allowLowRes);
+      case 'CLEAR_BUFFER':
+        return handleClearBuffer(req.lang, req.allowLowRes);
+      default:
+        return false; // Not a known message type
     }
   },
 );
@@ -64,20 +63,18 @@ async function handleFetchApod(date?: string, lang?: string) {
       height: data?.height,
     });
 
-    if (data?.blob) {
+    if (data?.blob && data.blob.size > 1024) {
       await saveImageBlob(rawData.date, data.blob);
     }
 
-    // Cache it
     const today = date || new Date().toISOString().split('T')[0];
     await browser.storage.local.set({ [today]: enriched });
     return { data: enriched, fromCache: false };
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    // Fallback to latest cached entry on any error
     const allCache = await browser.storage.local.get(null);
     const keys = Object.keys(allCache)
-      .filter((k) => k !== 'random_buffer')
+      .filter((k) => k !== BUFFER_KEY && k !== PURGE_KEY)
       .sort()
       .reverse();
     if (keys.length > 0) {
@@ -87,133 +84,162 @@ async function handleFetchApod(date?: string, lang?: string) {
   }
 }
 
-const BUFFER_LIMIT = 3;
-const BUFFER_KEY = 'random_buffer';
 let isRefilling = false;
 
 async function handleClearBuffer(lang?: string, allowLowRes?: boolean) {
   await browser.storage.local.set({ [BUFFER_KEY]: [] });
-  refillBufferIfNeeded(0, lang, allowLowRes);
-  return { data: { success: true } };
+  // Start the incremental refill chain
+  setTimeout(() => refillBufferIfNeeded(lang, allowLowRes), 0);
+  return { success: true };
 }
 
 async function handleFetchRandom(lang?: string, allowLowRes?: boolean) {
   try {
     const result = await browser.storage.local.get(BUFFER_KEY);
-    const buffer: unknown[] = Array.isArray(result[BUFFER_KEY]) ? result[BUFFER_KEY] : [];
+    const buffer: any[] = Array.isArray(result[BUFFER_KEY]) ? result[BUFFER_KEY] : [];
 
     if (buffer.length > 0) {
       const dataToReturn = buffer.shift();
       await browser.storage.local.set({ [BUFFER_KEY]: buffer });
-      refillBufferIfNeeded(buffer.length, lang, allowLowRes);
+      // Lazy refill ONE item in the background
+      setTimeout(() => refillBufferIfNeeded(lang, allowLowRes), 100);
       return { data: dataToReturn };
     } else {
-      // Fetch live and apply resolution check if needed
-      const enriched = await fetchAndValidateRandomApod(lang, allowLowRes);
-      refillBufferIfNeeded(0, lang, allowLowRes);
-      return { data: enriched };
+      // ZERO LATENCY FALLBACK: If buffer is empty, return a random starter image
+      // while triggering a refill in the background.
+      const fallback = starterApods[Math.floor(Math.random() * starterApods.length)];
+      console.log(`[buffer] Empty! Using fallback: ${fallback.title}`);
+      
+      setTimeout(() => refillBufferIfNeeded(lang, allowLowRes), 100);
+      return { data: fallback, fromFallback: true };
     }
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const allCache = await browser.storage.local.get(null);
-    const keys = Object.keys(allCache)
-      .filter((k) => k !== BUFFER_KEY)
-      .sort()
-      .reverse();
-    if (keys.length > 0) {
-      return { data: allCache[keys[0]], fromCache: true, offline: true };
-    }
-    return { error: errorMessage };
+    // Final safety: even if everything fails, return the first starter APOD
+    return { data: starterApods[0], fromFallback: true };
   }
 }
 
 /**
- * Fetch a random APOD and verify its resolution.
- * Retries until a qualifying image is found (up to 10 attempts).
+ * Incremental Refill - Fetches EXACTLY ONE item if space remains.
+ * This prevents long-running loops that can cause the script to hang.
  */
-async function fetchAndValidateRandomApod(lang?: string, allowLowRes?: boolean) {
-  const MAX_ATTEMPTS = 5;
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    console.log(`[buffer] Attempt ${attempt + 1}: Fetching random discovery...`);
-    const rawData = await fetchRandomApod(lang);
-    
-    if (rawData.media_type !== 'image') {
-      console.log(`[buffer] Skipping ${rawData.media_type}: ${rawData.title}`);
-      continue;
-    }
-
-    const data = rawData.url ? await getImageData(rawData.hdurl || rawData.url) : null;
-    if (!data) {
-      console.log(`[buffer] Failed to probe image: ${rawData.title}`);
-      continue;
-    }
-
-    const isHighRes = data.width >= MIN_WIDTH && data.height >= MIN_HEIGHT;
-
-    if (allowLowRes || isHighRes) {
-      if (data.blob) {
-        await saveImageBlob(rawData.date, data.blob);
-      }
-      const enriched = await enrichData({
-        ...rawData,
-        width: data.width,
-        height: data.height,
-      });
-      console.log(`[buffer] Accepted ${isHighRes ? 'high-res' : 'low-res'} image: ${rawData.title}`);
-      return enriched;
-    }
-
-    console.log(`[buffer] Skipping low-res image (${data.width}x${data.height}): ${rawData.title}`);
+async function refillBufferIfNeeded(lang?: string, allowLowRes?: boolean) {
+  if (isRefilling) return;
+  
+  const result = await browser.storage.local.get(BUFFER_KEY);
+  const currentBuffer: any[] = Array.isArray(result[BUFFER_KEY]) ? result[BUFFER_KEY] : [];
+  
+  if (currentBuffer.length >= BUFFER_LIMIT) {
+    // Cleanup blobs we no longer need
+    performCleanup(currentBuffer);
+    return;
   }
 
-  // Exhausted attempts — fall back to whatever the last fetch was, or get one more
-  console.log(`[buffer] Exhausted attempts, falling back...`);
-  const rawData = await fetchRandomApod(lang);
-  const data = rawData.url ? await getImageData(rawData.hdurl || rawData.url) : null;
-  if (data?.blob) {
-    await saveImageBlob(rawData.date, data.blob);
-  }
-  return enrichData({ ...rawData, width: data?.width, height: data?.height });
-}
-
-async function refillBufferIfNeeded(currentLength: number, lang?: string, allowLowRes?: boolean) {
-  if (isRefilling || currentLength >= BUFFER_LIMIT) return;
   isRefilling = true;
   try {
-    const needed = BUFFER_LIMIT - currentLength;
-    for (let i = 0; i < needed; i++) {
-      const enriched = await fetchAndValidateRandomApod(lang, allowLowRes);
-      const result = await browser.storage.local.get(BUFFER_KEY);
-      const currentBuffer: unknown[] = Array.isArray(result[BUFFER_KEY]) ? result[BUFFER_KEY] : [];
-      currentBuffer.push(enriched);
-      await browser.storage.local.set({ [BUFFER_KEY]: currentBuffer });
+    console.log(`[buffer] refilling incrementally. Current size: ${currentBuffer.length}`);
+    const enriched = await fetchAndValidateRandomApod(lang, allowLowRes);
+    
+    // Check again to avoid races
+    const freshResult = await browser.storage.local.get(BUFFER_KEY);
+    const freshBuffer: any[] = Array.isArray(freshResult[BUFFER_KEY]) ? freshResult[BUFFER_KEY] : [];
+    
+    if (freshBuffer.length < BUFFER_LIMIT) {
+      freshBuffer.push(enriched);
+      await browser.storage.local.set({ [BUFFER_KEY]: freshBuffer });
     }
-
-    // Cleanup: Keep only blobs that are in the buffer or are the today's image
-    const result = await browser.storage.local.get(null);
-    const bufferedDates = ((result[BUFFER_KEY] as any[]) || []).map((item: any) => item.date);
-    const today = new Date().toISOString().split('T')[0];
-    const cachedDates = Object.keys(result).filter((k) => k !== BUFFER_KEY);
-    await clearOldImages([...bufferedDates, ...cachedDates, today]);
   } catch (err) {
-    console.error('Failed to refill random buffer', err);
+    console.error('Incremental refill failed', err);
   } finally {
     isRefilling = false;
   }
 }
 
-// ─── Lifecycle & Pre-fetching ────────────────────────────────
+async function performCleanup(buffer: any[]) {
+  try {
+    const result = await browser.storage.local.get(null);
+    const bufferedDates = buffer.map((item: any) => item.date);
+    const today = new Date().toISOString().split('T')[0];
+    const cachedDates = Object.keys(result).filter((k) => k !== BUFFER_KEY);
+    await clearOldImages([...bufferedDates, ...cachedDates, today]);
+  } catch (err) {
+    console.error('Cleanup failed', err);
+  }
+}
 
-browser.runtime.onInstalled.addListener(async () => {
-  // Prime the buffer on first install
-  const result = await browser.storage.local.get(BUFFER_KEY);
-  const buffer: unknown[] = Array.isArray(result[BUFFER_KEY]) ? result[BUFFER_KEY] : [];
-  refillBufferIfNeeded(buffer.length);
+/**
+ * Fetch a random APOD and verify its resolution.
+ * Retries until a qualifying image is found (up to 5 attempts).
+ */
+async function fetchAndValidateRandomApod(lang?: string, allowLowRes?: boolean) {
+  const MAX_ATTEMPTS = 5;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const rawData = await fetchRandomApod(lang);
+    if (rawData.media_type !== 'image') continue;
+
+    const data = rawData.url ? await getImageData(rawData.hdurl || rawData.url) : null;
+    if (!data) continue;
+
+    const isHighRes = data.width >= MIN_WIDTH && data.height >= MIN_HEIGHT;
+    if (allowLowRes || isHighRes) {
+      if (data.blob) await saveImageBlob(rawData.date, data.blob);
+      return await enrichData({ ...rawData, width: data.width, height: data.height });
+    }
+  }
+
+  // Fallback
+  const rawData = await fetchRandomApod(lang);
+  const data = rawData.url ? await getImageData(rawData.hdurl || rawData.url) : null;
+  if (data?.blob) await saveImageBlob(rawData.date, data.blob);
+  return enrichData({ ...rawData, width: data?.width, height: data?.height });
+}
+
+// ─── Lifecycle ───────────────────────────────────────────────
+
+browser.runtime.onInstalled.addListener(async (details) => {
+  // 1. One-time Cache Purge for the ORB fix
+  const purgeCheck = await browser.storage.local.get(PURGE_KEY);
+  if (!purgeCheck[PURGE_KEY]) {
+    console.log('[install] Purging legacy "poisoned" cache (ORB Migration)...');
+    try {
+      await clearOldImages([]); // Empty array = clear all
+      await browser.storage.local.set({ [PURGE_KEY]: true });
+    } catch (err) {
+      console.error('[install] Purge failed:', err);
+    }
+  }
+
+  if (details.reason === 'install' || details.reason === 'update') {
+    // Prime with STARTER DATA for instant first impression
+    console.log('[install] Seeding starter buffer (Nerd-Scale)...');
+    
+    // We don't fill the random_buffer with ALL 20 to keep it manageable,
+    // but we pre-fetch the BLOBS for all 20 so the fallback is instant.
+    await browser.storage.local.set({ [BUFFER_KEY]: starterApods.slice(0, 10) });
+    
+    // Progressively fetch blobs for ALL starter data
+    for (const item of starterApods) {
+      try {
+        const data = await getImageData(item.hdurl || item.url);
+        // Safety: ensure blob is not empty (ORB check)
+        if (data?.blob && data.blob.size > 1024) {
+          await saveImageBlob(item.date, data.blob);
+          console.log(`[install] Pre-fetched blob for: ${item.title} (${Math.round(data.blob.size/1024)}KB)`);
+        } else {
+          console.warn(`[install] Skipping empty/corrupted blob for: ${item.title}`);
+        }
+        // Small delay to be polite
+        await new Promise(r => setTimeout(r, 500));
+      } catch (err) {
+        console.error(`[install] Failed to pre-fetch blob:`, err);
+      }
+    }
+  }
+  
+  // Schedule full refill check
+  refillBufferIfNeeded();
 });
 
-browser.runtime.onStartup.addListener(async () => {
-  // Ensure buffer is full when the browser starts
-  const result = await browser.storage.local.get(BUFFER_KEY);
-  const buffer: unknown[] = Array.isArray(result[BUFFER_KEY]) ? result[BUFFER_KEY] : [];
-  refillBufferIfNeeded(buffer.length);
+browser.runtime.onStartup.addListener(() => {
+  refillBufferIfNeeded();
 });

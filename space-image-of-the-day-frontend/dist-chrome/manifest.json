@@ -10,6 +10,8 @@
   "host_permissions": [
     "http://localhost:5000/*",
     "https://api.nasa.gov/*",
+    "https://apod.nasa.gov/*",
+    "https://www.nasa.gov/*",
     "https://simbad.cds.unistra.fr/*"
   ],
   "chrome_url_overrides": {

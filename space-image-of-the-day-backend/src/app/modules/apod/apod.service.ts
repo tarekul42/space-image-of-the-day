@@ -1,16 +1,16 @@
 import axios from "axios";
 import { env } from "../../config/env.js";
-import redisClient from "../../config/redis.config.js";
 import logger from "../../utils/logger.js";
 import { IApodData } from "./apod.interface.js";
 import translate from "google-translate-api-x";
+import { StorageService } from "../../services/storage.service.js";
 
 const NASA_APOD_URL = "https://api.nasa.gov/planetary/apod";
 const CACHE_KEY_PREFIX = "apod:";
 
 /**
  * Fetch Astronomical Picture of the Day.
- * Checks cache first, then calls NASA API.
+ * Checks StorageService first (Redis -> MongoDB), then calls NASA API.
  */
 const getApodByDate = async (
   date?: string,
@@ -21,13 +21,13 @@ const getApodByDate = async (
   const cacheKey = `${CACHE_KEY_PREFIX}${targetLang}:${targetDate}`;
 
   try {
-    const cachedData = await redisClient.get(cacheKey);
+    const cachedData = await StorageService.get(cacheKey);
     if (cachedData) {
       logger.info(`🎯 Cache Hit for APOD: ${targetDate} (${targetLang})`);
-      return { data: JSON.parse(cachedData), source: "cache" };
+      return { data: cachedData, source: "cache" };
     }
   } catch (err) {
-    logger.error(err instanceof Error ? err : { err }, "Redis fetch error");
+    logger.error(err instanceof Error ? err : { err }, "Storage fetch error");
   }
 
   logger.info(`🌐 Fetching APOD from NASA for: ${targetDate}`);
@@ -71,13 +71,22 @@ const getApodByDate = async (
     more_info_url: `https://simbad.u-strasbg.fr/simbad/sim-basic?Ident=${encodeURIComponent(data.title)}`,
   };
 
-  try {
-    await redisClient.set(cacheKey, JSON.stringify(enrichedData), {
-      EX: 86400, // 24 hours
-    });
-  } catch (err) {
-    logger.error(err instanceof Error ? err : { err }, "Redis save error");
-  }
+  // Strip unnecessary NASA payload fields to optimize storage size
+  const minimalData: IApodData = {
+    date: enrichedData.date,
+    title: enrichedData.title,
+    explanation: enrichedData.explanation,
+    url: enrichedData.url,
+    hdurl: enrichedData.hdurl,
+    media_type: enrichedData.media_type,
+    service_version: enrichedData.service_version,
+    copyright: enrichedData.copyright,
+    object_type: enrichedData.object_type,
+    constellation: enrichedData.constellation,
+    more_info_url: enrichedData.more_info_url,
+  };
+
+  await StorageService.set(cacheKey, minimalData);
 
   return { data: enrichedData, source: "api" };
 };

@@ -3,14 +3,18 @@ import app from "./app.js";
 import { env } from "./app/config/env.js";
 import redisClient from "./app/config/redis.config.js";
 import logger from "./app/utils/logger.js";
+import { StorageService } from "./app/services/storage.service.js";
 
 let server: Server;
 
 async function bootstrap() {
   try {
-    // Connect to Redis
+    // 1. Connect to Redis (fast cache)
     await redisClient.connect();
     logger.info("✅ Initialized Redis connection");
+
+    // 2. Connect to Database (robust persistence)
+    await StorageService.init();
 
     // Start Server
     server = app.listen(env.PORT, () => {
